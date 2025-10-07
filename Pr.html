@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pressure Solver — Web Autarchic</title>
+
+<style>
+  :root{
+    --bg: #0f0f11;
+    --panel: #141416;
+    --muted: #9ea0a6;
+    --text: #e6e7ea;
+    --accent: #6a6ab0;
+    --accent-2: #8b8bd6;
+    --danger: #c75b5b;
+    --glass: rgba(255,255,255,0.02);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#0b0b0c);color:var(--text)}
+  .frame{
+    width:min(720px,94vw);
+    margin:6vh auto;
+    background:linear-gradient(180deg,var(--panel),#0f0f11);
+    border-radius:12px;
+    box-shadow:0 6px 30px rgba(0,0,0,0.7);
+    padding:22px;
+    border:1px solid rgba(255,255,255,0.02);
+  }
+
+  h1{
+    margin:0 0 12px 0;
+    font-size:1.15rem;
+    letter-spacing:0.02em;
+    color:var(--text);
+    font-weight:600;
+  }
+  p.lead{margin:0 0 18px 0;color:var(--muted);font-size:0.95rem}
+
+  .row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .label{width:220px;color:var(--muted);text-align:right;padding-right:8px;font-size:0.95rem}
+  .input, textarea{
+    flex:1;
+    background:var(--glass);
+    border:1px solid rgba(255,255,255,0.03);
+    padding:10px 12px;
+    color:var(--text);
+    border-radius:8px;
+    outline:none;
+    font-size:0.95rem;
+  }
+
+  .input:focus{box-shadow:0 0 0 4px rgba(106,106,176,0.08);border-color:var(--accent-2)}
+  .btn{
+    background:linear-gradient(180deg,var(--accent),var(--accent-2));
+    border:none;color:white;padding:10px 14px;border-radius:8px;
+    cursor:pointer;font-weight:600;
+  }
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .btn.small{padding:8px 10px;font-size:0.9rem}
+
+  .controls{display:flex;gap:10px;align-items:center;margin-top:8px}
+  .output{
+    margin-top:14px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    border:1px solid rgba(255,255,255,0.02);
+    padding:12px;border-radius:8px;color:var(--muted);min-height:54px;
+    white-space:pre-wrap;font-family:monospace;
+  }
+
+  .example-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .chip{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;color:var(--muted);cursor:pointer}
+  .chip:hover{background:rgba(106,106,176,0.06);color:var(--text)}
+
+  .hint{color:var(--muted);font-size:0.88rem;margin-top:8px}
+  footer{margin-top:14px;color:rgba(255,255,255,0.06);font-size:0.78rem;text-align:center}
+  @media (max-width:520px){
+    .label{width:36%}
+    .row{align-items:stretch;flex-direction:column}
+    .label{text-align:left;padding-right:0}
+  }
+</style>
+</head>
+<body>
+  <div class="frame" role="application" aria-labelledby="title">
+    <h1 id="title">Pressure Solver — Web Autarchic</h1>
+    <p class="lead">Mouse-driven solver. Enter start, three numbers, and a target. Click Solve.</p>
+
+    <div class="row">
+      <div class="label">Start Pressure:</div>
+      <input id="start" class="input" type="text" placeholder="e.g. 20" aria-label="Start pressure" />
+    </div>
+
+    <div class="row">
+      <div class="label">Numbers (comma separated):</div>
+      <input id="numbers" class="input" type="text" placeholder="e.g. 5,8,12" aria-label="Numbers" />
+    </div>
+
+    <div class="row">
+      <div class="label">Target Pressure:</div>
+      <input id="target" class="input" type="text" placeholder="e.g. 33" aria-label="Target" />
+    </div>
+
+    <div class="controls">
+      <button id="solveBtn" class="btn" title="Click to solve">Solve</button>
+      <button id="clearBtn" class="btn ghost small" title="Clear inputs">Clear</button>
+
+      <div style="flex:1"></div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <div class="hint">Presets</div>
+        <div class="example-row" aria-hidden="false">
+          <div class="chip" data-preset="10|3,4,2|15">Easy</div>
+          <div class="chip" data-preset="50|10,5,12|47">Medium</div>
+          <div class="chip" data-preset="73|19,23,41|36">Hard</div>
+          <div class="chip" data-preset="20|5,8,12|33">Skip-required</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="output" class="output" aria-live="polite"></div>
+
+    <p class="hint">Explanation: the solver tries adding, subtracting, or skipping each number.</p>
+
+    <footer>Open this file in a browser to run. No server required.</footer>
+  </div>
+
+<script>
+/*
+  Client-side solver logic mirrors the desktop version.
+  - Mouse-driven only (no keyboard handlers).
+  - Works for any sequence length (not limited to 3).
+*/
+
+function parseIntsFromString(str) {
+  if (!str) return null;
+  // allow whitespace and optional trailing commas
+  const parts = str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  const nums = [];
+  for (const p of parts) {
+    const n = Number(p);
+    if (!Number.isInteger(n)) return null;
+    nums.push(n);
+  }
+  return nums;
+}
+
+function generateOpCombinations(n) {
+  // returns array of arrays like [['+','-',''], ...]
+  const ops = ['+', '-', ''];
+  const res = [];
+
+  // use simple recursion to avoid hardcoding length
+  function recur(i, acc) {
+    if (i === n) { res.push(acc.slice()); return; }
+    for (const o of ops) { acc.push(o); recur(i+1, acc); acc.pop(); }
+  }
+  recur(0, []);
+  return res;
+}
+
+function solvePressure(start, sequence, target) {
+  const combos = generateOpCombinations(sequence.length);
+  for (const ops of combos) {
+    let result = start;
+    const parts = [String(start)];
+    for (let i=0; i<sequence.length; i++) {
+      const val = sequence[i];
+      const op = ops[i];
+      if (op === '+') { result += val; parts.push(`+ ${val}`); }
+      else if (op === '-') { result -= val; parts.push(`- ${val}`); }
+      else { parts.push(`(skip ${val})`); }
+    }
+    if (result === target) {
+      return { expr: parts.join(' '), result };
+    }
+  }
+  return null;
+}
+
+function setOutput(text, tone='muted') {
+  const out = document.getElementById('output');
+  out.textContent = text;
+  // simple color feedback via inline style
+  if (tone === 'success') { out.style.color = getComputedStyle(document.documentElement).getPropertyValue('--accent'); }
+  else if (tone === 'danger') { out.style.color = getComputedStyle(document.documentElement).getPropertyValue('--danger'); }
+  else { out.style.color = getComputedStyle(document.documentElement).getPropertyValue('--muted'); }
+}
+
+document.getElementById('solveBtn').addEventListener('click', () => {
+  const startEl = document.getElementById('start');
+  const numbersEl = document.getElementById('numbers');
+  const targetEl = document.getElementById('target');
+
+  const startStr = startEl.value.trim();
+  const numsStr = numbersEl.value.trim();
+  const targetStr = targetEl.value.trim();
+
+  if (!startStr || !numsStr || !targetStr) {
+    return setOutput('Please fill all fields (start, numbers, target).', 'danger');
+  }
+
+  const start = Number(startStr);
+  const sequence = parseIntsFromString(numsStr);
+  const target = Number(targetStr);
+
+  if (!Number.isInteger(start) || !Number.isInteger(target) || sequence === null) {
+    return setOutput('Invalid input — please use integers and comma-separated numbers.', 'danger');
+  }
+  if (sequence.length !== 3) {
+    return setOutput('Please enter exactly 3 numbers (comma separated).', 'danger');
+  }
+
+  const sol = solvePressure(start, sequence, target);
+  if (sol) {
+    setOutput(`Solution found:\n${sol.expr} = ${sol.result}`, 'success');
+  } else {
+    setOutput('No solution found.', 'muted');
+  }
+});
+
+// clear button
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('start').value = '';
+  document.getElementById('numbers').value = '';
+  document.getElementById('target').value = '';
+  setOutput('');
+});
+
+// presets
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const raw = chip.getAttribute('data-preset'); // "start|a,b,c|target"
+    const [s, nums, t] = raw.split('|');
+    document.getElementById('start').value = s;
+    document.getElementById('numbers').value = nums;
+    document.getElementById('target').value = t;
+    setOutput('');
+  });
+});
+
+// initialize with a tiny hint
+setOutput('Pick a preset or enter values, then click Solve.');
+</script>
+</body>
+</html>
