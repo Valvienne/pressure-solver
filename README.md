@@ -5,7 +5,7 @@
 ---
 
 ## Overview
-Pressure Solver is a **web-based, mouse-driven solver** for the water pressure puzzles in **Outlast Trials**.  
+Pressure Solver is a **web-based** for the water pressure puzzles in **Outlast Trials**.  
 Enter a starting number, three integers, and a target — the solver finds a combination of **add, subtract, or skip** operations to reach the target.
 
 Fully **Autarchic-themed**, dark, sleek, and usable entirely in the browser — no installation required.
@@ -36,6 +36,5 @@ Fully **Autarchic-themed**, dark, sleek, and usable entirely in the browser — 
 
 ## Notes
 - Designed specifically for **Outlast Trials water pressure puzzles**.  
-- Fully client-side: works in any modern browser.  
-- Mouse-driven interface only — no keyboard input required.  
+- Fully client-side: works in any modern browser.    
 - Dark, minimal Autarchic theme for immersive experience.
